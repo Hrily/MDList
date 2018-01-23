@@ -314,7 +314,7 @@ void MDList<T>::insert (ULL key, T val)
 /**
  * Prints MDList.
  * Only for debug purposes.
- * @param The MDList to print
+ * @param mdList The MDList to print
  */
 template <class T>
 void printMDList (MDList<T> mdList)
