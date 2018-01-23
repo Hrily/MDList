@@ -190,4 +190,173 @@ vector<int> Node<T>::getCoordinates ()
     return this->COORDINATES;
 }
 
+
+/**
+ * MDList class
+ */
+template <class T>
+class MDList
+{
+    /**
+     * The D value of MDList.
+     */
+    int                         D;
+    /**
+     * The key space.
+     */
+    ULL                         N;
+    /**
+     * Head or Root of the MDList.
+     */
+    Node<T>*                    root;
+    pair<Node<T>*, Node<T>*>    locatePredecessor(vector<int>);
+    public:
+                                MDList(int, ULL);
+    void                        insert(ULL, T);
+    T                           find(ULL);
+    void                        remove(ULL);
+    template <class _T>
+    friend void                 printMDList(MDList<_T>);
+};
+
+/**
+ * MDList constructor.
+ * @param D The D value of MDList.
+ * @param N The key space.
+ */
+template <class T>
+MDList<T>::MDList (int D, ULL N)
+{
+    this->D = D;
+    this->N = N;
+    this->root = new Node<T>(0, D, N);
+}
+
+/**
+ * Locate Predecessor/Parent of given coordinates.
+ * @param coordinates The given coordinates.
+ * @returns (predecessor, childIndex) if found else NULL
+ *          where childIndex is the index where the child is.
+ */
+template <class T>
+pair<Node<T>*, Node<T>*> MDList<T>::locatePredecessor (vector<int> coordinates)
+{
+    Node<T>* current = this->root;
+    Node<T>* predecessor = NULL;
+    int d = 0;
+    while (d < this->D)
+    {
+        while (current != NULL && coordinates[d] > current->getCoordinates()[d]){
+            predecessor = current;
+            current = current->getChild(d);
+        }
+        // Check if we found the predecessor.
+        if (current == NULL || coordinates[d] < current->getCoordinates()[d])
+            break;
+        else
+            d++;
+    }
+    return make_pair(predecessor, current);
+}
+
+/**
+ * Insert (key, value) to MDList.
+ * @param key The key.
+ * @param val The value.
+ */
+template <class T>
+void MDList<T>::insert (ULL key, T val)
+{
+    vector<int> coordinates = keyToCoordinates(key, this->D, this->N);
+    pair<Node<T>*, Node<T>*> p = locatePredecessor(coordinates);
+    Node<T>* predecessor = p.first;
+    Node<T>* current = p.second;
+    // Check if key already exists.
+    if (current != NULL && key == current->getKey())
+    {
+        // Update value and return.
+        current->setValue(val);
+        return;
+    }
+    // Key doesn't exits, create new Node.
+    Node<T>* node = new Node<T>(key, this->D, this->N, val);
+    int d = 0;
+    while (d < this->D && coordinates[d] <= predecessor->getCoordinates()[d])
+        d++;
+    if (d >= this->D)
+        throw "Given key is out of key space";
+    int _d = d;
+    // If current is NULL, then node is dth child of predecessor.
+    if (current == NULL)
+    {
+        predecessor->setChild(d, node);
+        return;
+    }
+    // Assign appropriate childrens to node.
+    while (d < this->D)
+    {
+        // Check if current can be dth child of node.
+        if (node->getCoordinates()[d] < current->getCoordinates()[d]){
+            node->setChild(d, current);
+            break;
+        }
+        // Else dth child of current is dth child of node
+        node->setChild(d, current->getChild(d));
+        current->setChild(d, NULL);
+        d++;
+    }
+    if (d >= this->D)
+        throw "Given key is out of key space";
+    // Assign predecessor as parent to node.
+    predecessor->setChild(_d, node);
+}
+
+/**
+ * Prints MDList.
+ * Only for debug purposes.
+ * @param The MDList to print
+ */
+template <class T>
+void printMDList (MDList<T> mdList)
+{
+    vector< Node<T>* > stack;
+    stack.push_back(mdList.root);
+    while(stack.size() > 0)
+    {
+        Node<T>* node = stack.back();
+        stack.pop_back();
+        cout<<node->getKey()<<" ";
+        vector<int> coordinates = node->getCoordinates();
+        cout<<"[";
+        for (int d = 0; d < mdList.D; d++)
+        {
+            cout<<coordinates[d]<<", ";
+        }
+        cout<<"] : ";
+        if (node->getValue() != NULL)
+            cout<<node->getValue()<<"\n\t";
+        else
+            cout<<"NULL\n\t";
+        for (int d = 0; d < mdList.D; d++)
+        {
+            Node<T>* child = node->getChild(d);
+            cout<<d<<" : ";
+            if (child == NULL)
+                cout<<"NULL , ";
+            else 
+            {
+                stack.push_back(child);
+                vector<int> coordinates = child->getCoordinates();
+                cout<<"[";
+                for (int d = 0; d < mdList.D; d++)
+                {
+                    cout<<coordinates[d]<<", ";
+                }
+                cout<<"] , ";
+            }
+        }
+        cout<<endl;
+    }
+}
+
 #endif
