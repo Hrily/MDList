@@ -4,30 +4,28 @@
 using namespace std;
 
 int main () {
-    MDList<int> mdlist(2, 9);
+    MDList<int> mdlist(3, 64);
+
+    mdlist.insert(18, 1);
+    mdlist.insert(33, 1);
 
     mdlist.insert(4, 1);
-    printMDList(mdlist);
-    cout<<endl;
-
-    mdlist.insert(3, 1);
-    printMDList(mdlist);
-    cout<<endl;
-
-    mdlist.insert(8, 1);
-    printMDList(mdlist);
-    cout<<endl;
-
-    mdlist.insert(2, 1);
-    printMDList(mdlist);
-    cout<<endl;
+    mdlist.insert(6, 1);
 
     mdlist.insert(1, 1);
-    printMDList(mdlist);
-    cout<<endl;
+    mdlist.insert(2, 1);
 
-    mdlist.insert(7, 1);
-    mdlist.insert(5, 1);
+    mdlist.insert(19, 1);
+    mdlist.insert(22, 1);
+
+    mdlist.insert(34, 1);
+    mdlist.insert(36, 1);
+
+    mdlist.insert(48, 1);
+    
     printMDList(mdlist);
-    cout<<endl;
+
+    mdlist.insert(32, 1);
+
+    printMDList(mdlist);
 }

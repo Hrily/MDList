@@ -51,9 +51,9 @@ vector<int> keyToCoordinates (ULL key, int D, ULL N)
 {
     int M = nthRoot(N, D);
     vector<int> coordinates(D);
-    int i = 0;
-    while (key > 0 && i < D) {
-        coordinates[i++] = key % M;
+    int i = D-1;
+    while (key > 0 && i >= 0) {
+        coordinates[i--] = key % M;
         key /= M;
     }
     return coordinates;
@@ -305,8 +305,6 @@ void MDList<T>::insert (ULL key, T val)
         current->setChild(d, NULL);
         d++;
     }
-    if (d >= this->D)
-        throw "Given key is out of key space";
     // Assign predecessor as parent to node.
     predecessor->setChild(_d, node);
 }
