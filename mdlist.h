@@ -15,6 +15,7 @@
 #include <mutex>
 #include <cmath>
 #include <exception>
+#include <iostream>
 
 #define ULL unsigned long long
 
@@ -307,6 +308,22 @@ void MDList<T>::insert (ULL key, T val)
     }
     // Assign predecessor as parent to node.
     predecessor->setChild(_d, node);
+}
+
+/**
+ * Searches for given key.
+ * @param key The key.
+ * @returns The value if key is present else NULL.
+ */
+template <class T>
+T MDList<T>::find (ULL key) 
+{
+    vector<int> coordinates = keyToCoordinates(key, this->D, this->N);    
+    pair<Node<T>*, Node<T>*> p = locatePredecessor(coordinates);
+    Node<T>* current = p.second;
+    if (current->getKey() == key)
+        return current->getValue();
+    return NULL;
 }
 
 /**
