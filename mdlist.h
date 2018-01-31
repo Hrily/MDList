@@ -131,7 +131,7 @@ Node<T>::Node (ULL key, int D, ULL N, T val)
 template <class T>
 void Node<T>::lock () 
 {
-    mutex.lock();
+    this->mutex.lock();
 }
 
 /**
@@ -141,7 +141,7 @@ void Node<T>::lock ()
 template <class T>
 bool Node<T>::try_lock ()
 {
-    return mutex.try_lock();
+    return this->mutex.try_lock();
 }
 
 /**
@@ -150,7 +150,7 @@ bool Node<T>::try_lock ()
 template <class T>
 void Node<T>::unlock ()
 {
-    mutex.unlock();
+    this->mutex.unlock();
 }
 
 /**
@@ -171,9 +171,9 @@ ULL Node<T>::getKey ()
 template <class T>
 void Node<T>::setValue (T val)
 {
-    val_mutex.lock();
+    this->val_mutex.lock();
     this->val = val;
-    val_mutex.unlock();
+    this->val_mutex.unlock();
 }
 
 /**
@@ -183,9 +183,9 @@ void Node<T>::setValue (T val)
 template <class T>
 T Node<T>::getValue ()
 {
-    val_mutex.lock();
+    this->val_mutex.lock();
     T t = this->val;
-    val_mutex.unlock();
+    this->val_mutex.unlock();
     return t;
 }
 
@@ -199,9 +199,9 @@ void Node<T>::setChild (int index, Node* childNode)
 {
     if (index < 0 && index >= this->child.size())
         throw "Index out of bounds";
-    child_mutex.lock();
+    this->child_mutex.lock();
     this->child[index] = childNode;
-    child_mutex.unlock();
+    this->child_mutex.unlock();
 }
 
 /**
@@ -214,9 +214,9 @@ Node<T>* Node<T>::getChild (int index)
 {
     if (index < 0 && index >= this->child.size())
         throw "Index out of bounds";
-    child_mutex.lock();
+    this->child_mutex.lock();
     Node<T>* node = this->child[index];
-    child_mutex.unlock();
+    this->child_mutex.unlock();
     return node;
 }
 
@@ -348,20 +348,14 @@ void MDList<T>::insert (ULL key, T val)
     }
     // Key doesn't exits, create new Node.
     Node<T>* node = new Node<T>(key, this->D, this->N, val);
+    // Find position of node in predecessor
     int d = 0;
     while (d < this->D && coordinates[d] <= predecessor->getCoordinates()[d])
         d++;
     if (d >= this->D)
         throw "Given key is out of key space";
     int _d = d;
-    if (predecessor->getChild(_d) != current){
-        if (predecessor != NULL)
-            predecessor->unlock();
-        if (current != NULL)
-            current->unlock();
-        goto start;
-    }
-    // If current is NULL, then node is dth child of predecessor.
+    // If current is NULL, then node is _dth child of predecessor.
     if (current == NULL)
     {
         predecessor->setChild(_d, node);
@@ -507,6 +501,7 @@ void printMDList (MDList<T> mdList)
 
 /**
  * Finds and prints node for given key.
+ * Only for debug purposes.
  * @param mdlist The mdlist.
  * @param key The key.
  */
@@ -548,7 +543,8 @@ void findAndPrint (MDList<T> mdlist, ULL key)
             }
         }
         cout<<endl;
-    } else 
+    } 
+    else 
     {
         cout << key << " Not found!\n";
     }
