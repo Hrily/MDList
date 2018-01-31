@@ -87,9 +87,20 @@ class Node
      * Mutex lock for this Node.
      */
     std::mutex      mutex;
+    /**
+     * Mutex lock for children.
+     */
+    std::mutex      child_mutex;
+    /**
+     * Mutex lock for value.
+     */
+    std::mutex      val_mutex;
 
     public:
                     Node(ULL, int, ULL, T val = NULL);
+    void            lock();
+    bool            try_lock();
+    void            unlock();
     ULL             getKey();
     void            setValue(T);
     T               getValue();
@@ -115,8 +126,36 @@ Node<T>::Node (ULL key, int D, ULL N, T val)
 }
 
 /**
+ * Locks the node mutex.
+ */
+template <class T>
+void Node<T>::lock () 
+{
+    mutex.lock();
+}
+
+/**
+ * Non blocking lock operation on node mutex.
+ * @returns True if locked else False.
+ */
+template <class T>
+bool Node<T>::try_lock ()
+{
+    return mutex.try_lock();
+}
+
+/**
+ * Unlocks the node mutex.
+ */
+template <class T>
+void Node<T>::unlock ()
+{
+    mutex.unlock();
+}
+
+/**
  * Getter for key
- * @returns The key of Node.\
+ * @returns The key of Node.
  */
 template <class T>
 ULL Node<T>::getKey ()
@@ -132,9 +171,9 @@ ULL Node<T>::getKey ()
 template <class T>
 void Node<T>::setValue (T val)
 {
-    this->mutex.lock();
+    val_mutex.lock();
     this->val = val;
-    this->mutex.unlock();
+    val_mutex.unlock();
 }
 
 /**
@@ -144,9 +183,9 @@ void Node<T>::setValue (T val)
 template <class T>
 T Node<T>::getValue ()
 {
-    this->mutex.lock();
+    val_mutex.lock();
     T t = this->val;
-    this->mutex.unlock();
+    val_mutex.unlock();
     return t;
 }
 
@@ -160,9 +199,9 @@ void Node<T>::setChild (int index, Node* childNode)
 {
     if (index < 0 && index >= this->child.size())
         throw "Index out of bounds";
-    this->mutex.lock();
+    child_mutex.lock();
     this->child[index] = childNode;
-    this->mutex.unlock();
+    child_mutex.unlock();
 }
 
 /**
@@ -175,9 +214,9 @@ Node<T>* Node<T>::getChild (int index)
 {
     if (index < 0 && index >= this->child.size())
         throw "Index out of bounds";
-    this->mutex.lock();
+    child_mutex.lock();
     Node<T>* node = this->child[index];
-    this->mutex.unlock();
+    child_mutex.unlock();
     return node;
 }
 
@@ -215,9 +254,11 @@ class MDList
                                 MDList(int, ULL);
     void                        insert(ULL, T);
     T                           find(ULL);
-    void                        remove(ULL);
+    T                           remove(ULL);
     template <class _T>
     friend void                 printMDList(MDList<_T>);
+    template <class _T>
+    friend void                 findAndPrint(MDList<_T>, ULL);
 };
 
 /**
@@ -260,6 +301,7 @@ pair<Node<T>*, Node<T>*> MDList<T>::locatePredecessor (vector<int> coordinates)
     return make_pair(predecessor, current);
 }
 
+std::mutex print;
 /**
  * Insert (key, value) to MDList.
  * @param key The key.
@@ -268,15 +310,40 @@ pair<Node<T>*, Node<T>*> MDList<T>::locatePredecessor (vector<int> coordinates)
 template <class T>
 void MDList<T>::insert (ULL key, T val)
 {
+    if (key < 0 || key >= N)
+        return;
+    start:
     vector<int> coordinates = keyToCoordinates(key, this->D, this->N);
     pair<Node<T>*, Node<T>*> p = locatePredecessor(coordinates);
     Node<T>* predecessor = p.first;
     Node<T>* current = p.second;
+    // Lock for thread safety
+    if (predecessor != NULL && !predecessor->try_lock())
+        goto start;
+    if (current != NULL && !current->try_lock())
+    {
+        if (predecessor != NULL)
+            predecessor->unlock();
+        goto start;
+    }
+    // Check predecessor and current are still valid
+    p = locatePredecessor(coordinates);
+    if (predecessor != p.first || current != p.second)
+    {
+        if (predecessor != NULL)
+            predecessor->unlock();
+        if (current != NULL)
+            current->unlock();
+        goto start;
+    }
     // Check if key already exists.
     if (current != NULL && key == current->getKey())
     {
         // Update value and return.
         current->setValue(val);
+        if (predecessor != NULL)
+            predecessor->unlock();
+        current->unlock();
         return;
     }
     // Key doesn't exits, create new Node.
@@ -287,10 +354,18 @@ void MDList<T>::insert (ULL key, T val)
     if (d >= this->D)
         throw "Given key is out of key space";
     int _d = d;
+    if (predecessor->getChild(_d) != current){
+        if (predecessor != NULL)
+            predecessor->unlock();
+        if (current != NULL)
+            current->unlock();
+        goto start;
+    }
     // If current is NULL, then node is dth child of predecessor.
     if (current == NULL)
     {
-        predecessor->setChild(d, node);
+        predecessor->setChild(_d, node);
+        predecessor->unlock();
         return;
     }
     // Assign appropriate childrens to node.
@@ -308,6 +383,8 @@ void MDList<T>::insert (ULL key, T val)
     }
     // Assign predecessor as parent to node.
     predecessor->setChild(_d, node);
+    predecessor->unlock();
+    current->unlock();
 }
 
 /**
@@ -318,6 +395,8 @@ void MDList<T>::insert (ULL key, T val)
 template <class T>
 T MDList<T>::find (ULL key) 
 {
+    if (key < 0 || key >= N)
+        return NULL;
     vector<int> coordinates = keyToCoordinates(key, this->D, this->N);    
     pair<Node<T>*, Node<T>*> p = locatePredecessor(coordinates);
     Node<T>* current = p.second;
@@ -325,6 +404,58 @@ T MDList<T>::find (ULL key)
         return current->getValue();
     return NULL;
 }
+
+/**
+ * Removes the given key.
+ * @param key The key.
+ * @returns The value if key present and removed else NULL.
+ */
+template <class T>
+T MDList<T>::remove(ULL key)
+{
+    if (key < 0 || key >= N)
+        return NULL;
+    // If given key is root
+    // just remove the value
+    // because root cannot be deleted.
+    if (key == 0) {
+        T val = root->getValue();
+        this->root->setValue(NULL);
+        return val;
+    }
+    vector<int> coordinates = keyToCoordinates(key, this->D, this->N);    
+    pair<Node<T>*, Node<T>*> p = locatePredecessor(coordinates);
+    Node<T>* predecessor = p.first;
+    Node<T>* current = p.second;
+    if (current == NULL || current->getKey() != key)
+        return NULL;
+
+    // Find the index of current in predecessor
+    int d = 0;
+    while (d < this->D && predecessor->getChild(d) != current)
+        d++;
+    if (d >= this->D)
+        throw "Given key is out of key space";
+    // The last indexed child of current will be the new current
+    Node<T>* new_current = NULL;
+    int _d = this->D;
+    while (_d > 0 && new_current == NULL) {
+        _d--;
+        new_current = current->getChild(_d);
+    }
+    // Transer children of current to new current
+    _d--;
+    while (_d >= 0) {
+        new_current->setChild(_d, current->getChild(_d));
+        _d--;
+    }
+    // Update predecessor pointer
+    predecessor->setChild(d, new_current);
+    T val = current->getValue();
+    delete current;
+    return val;
+}
+
 
 /**
  * Prints MDList.
@@ -371,6 +502,55 @@ void printMDList (MDList<T> mdList)
             }
         }
         cout<<endl;
+    }
+}
+
+/**
+ * Finds and prints node for given key.
+ * @param mdlist The mdlist.
+ * @param key The key.
+ */
+template <class T>
+void findAndPrint (MDList<T> mdlist, ULL key) 
+{
+    vector<int> coordinates = keyToCoordinates(key, mdlist.D, mdlist.N);    
+    pair<Node<T>*, Node<T>*> p = mdlist.locatePredecessor(coordinates);
+    Node<T>* node = p.second;
+    if (node->getKey() == key)
+    {
+        cout<<node->getKey()<<" ";
+        vector<int> coordinates = node->getCoordinates();
+        cout<<"[";
+        for (int d = 0; d < mdlist.D; d++)
+        {
+            cout<<coordinates[d]<<", ";
+        }
+        cout<<"] : ";
+        if (node->getValue() != NULL)
+            cout<<node->getValue()<<"\n\t";
+        else
+            cout<<"NULL\n\t";
+        for (int d = 0; d < mdlist.D; d++)
+        {
+            Node<T>* child = node->getChild(d);
+            cout<<d<<" : ";
+            if (child == NULL)
+                cout<<"NULL , ";
+            else 
+            {
+                vector<int> coordinates = child->getCoordinates();
+                cout<<"[";
+                for (int d = 0; d < mdlist.D; d++)
+                {
+                    cout<<coordinates[d]<<", ";
+                }
+                cout<<"] , ";
+            }
+        }
+        cout<<endl;
+    } else 
+    {
+        cout << key << " Not found!\n";
     }
 }
 
