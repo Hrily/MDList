@@ -5,7 +5,7 @@
  * From 2016 IEEE 36th International Conference on Distributed 
  * Computing Systems.
  * 
- * @author Hrishikesh Hiraskar
+ * @author Hrishikesh Hiraskar <hrishihiraskar@gmail.com>
  */
 
 #ifndef _mdlist_h_
@@ -62,6 +62,9 @@ vector<int> keyToCoordinates (ULL key, int D, ULL N)
 
 /**
  * Node class.
+ * Each node has a key and coordinates in key space
+ * and it stores a value. It also has a mutex for
+ * thread safety in multi-threaded environment.
  */
 template <class T>
 class Node
@@ -233,6 +236,10 @@ vector<int> Node<T>::getCoordinates ()
 
 /**
  * MDList class
+ * MDList is a dictionary based datastruture which stores 
+ * (key, value) pairs. It has a root node. Opoerations performed
+ * on a MDList are insert, find, remove.
+ * MDList is Lock-Free datastructure, so it is thread safe.
  */
 template <class T>
 class MDList
@@ -277,8 +284,8 @@ MDList<T>::MDList (int D, ULL N)
 /**
  * Locate Predecessor/Parent of given coordinates.
  * @param coordinates The given coordinates.
- * @returns (predecessor, childIndex) if found else NULL
- *          where childIndex is the index where the child is.
+ * @returns Pair(predecessor, current) where predecessor is
+ *          parent of current.
  */
 template <class T>
 pair<Node<T>*, Node<T>*> MDList<T>::locatePredecessor (vector<int> coordinates)
@@ -301,7 +308,6 @@ pair<Node<T>*, Node<T>*> MDList<T>::locatePredecessor (vector<int> coordinates)
     return make_pair(predecessor, current);
 }
 
-std::mutex print;
 /**
  * Insert (key, value) to MDList.
  * @param key The key.

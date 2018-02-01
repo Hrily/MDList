@@ -3,6 +3,7 @@
 #include <boost/test/unit_test.hpp>
 #include <vector>
 #include <thread>
+#include <mutex>
 #include <algorithm>
 #include "../mdlist.h"
 using namespace std;
@@ -13,18 +14,19 @@ using namespace std;
 MDList<int> mdlist(8, 1LL << 32);
 vector<int> pool;
 // MDList<int> mdlist(2, 9);
+// mutex print;
 
 void insertElements (int n)
 {
     for (int i = n*RANGE; i < (n+1)*RANGE; i++)
     {
-        print.lock();
+        // print.lock();
         // cout << n << " : Deleting " << pool[i] << endl;
-        print.unlock();
+        // print.unlock();
         int f = mdlist.remove(pool[i]);
-        print.lock();
+        // print.lock();
         // cout << n << " : Deleted " << pool[i] << " : "  << f << endl;
-        print.unlock();
+        // print.unlock();
     }
 }
 
