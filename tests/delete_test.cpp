@@ -14,7 +14,8 @@ BOOST_AUTO_TEST_CASE(Test1) {
         mdlist.insert(i, i);
     for (int i = 0; i < N; i++)
         BOOST_CHECK_EQUAL(i, mdlist.remove(i));
-    BOOST_CHECK_EQUAL(NULL, mdlist.remove(60));
+    for (int i = 0; i < N; i++)
+        BOOST_CHECK_EQUAL(NULL, mdlist.find(i));
     BOOST_CHECK_EQUAL(NULL, mdlist.remove(65));
 }
 

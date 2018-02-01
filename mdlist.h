@@ -394,7 +394,7 @@ T MDList<T>::find (ULL key)
     vector<int> coordinates = keyToCoordinates(key, this->D, this->N);    
     pair<Node<T>*, Node<T>*> p = locatePredecessor(coordinates);
     Node<T>* current = p.second;
-    if (current->getKey() == key)
+    if (current != NULL && current->getKey() == key)
         return current->getValue();
     return NULL;
 }
@@ -412,17 +412,34 @@ T MDList<T>::remove(ULL key)
     // If given key is root
     // just remove the value
     // because root cannot be deleted.
-    if (key == 0) {
+    if (key == 0) 
+    {
         T val = root->getValue();
         this->root->setValue(NULL);
         return val;
     }
+    start_r:
     vector<int> coordinates = keyToCoordinates(key, this->D, this->N);    
     pair<Node<T>*, Node<T>*> p = locatePredecessor(coordinates);
     Node<T>* predecessor = p.first;
     Node<T>* current = p.second;
+    // Lock for thread safety
+    if (predecessor != NULL && !predecessor->try_lock())
+        goto start_r;
+    if (current != NULL && !current->try_lock())
+    {
+        if (predecessor != NULL)
+            predecessor->unlock();
+        goto start_r;
+    }
     if (current == NULL || current->getKey() != key)
+    {
+        print.lock();
+        // cout<<key<<" = "<<current->getKey()<<endl;
+        print.unlock();
+        // printMDList(*this);
         return NULL;
+    }
 
     // Find the index of current in predecessor
     int d = 0;
@@ -437,6 +454,28 @@ T MDList<T>::remove(ULL key)
         _d--;
         new_current = current->getChild(_d);
     }
+    // Try lock for new_current
+    if (new_current != NULL && !new_current->try_lock())
+    {
+        if (predecessor != NULL)
+            predecessor->unlock();
+        if (current != NULL)
+            current->unlock();
+        goto start_r;
+    }
+    // Check predecessor and current are still valid
+    p = locatePredecessor(coordinates);
+    if (predecessor != p.first || current != p.second || 
+            (current != NULL && current->getKey() != key))
+    {
+        if (predecessor != NULL)
+            predecessor->unlock();
+        if (current != NULL)
+            current->unlock();
+        if (new_current != NULL)
+            new_current->unlock();
+        goto start_r;
+    }
     // Transer children of current to new current
     _d--;
     while (_d >= 0) {
@@ -445,6 +484,10 @@ T MDList<T>::remove(ULL key)
     }
     // Update predecessor pointer
     predecessor->setChild(d, new_current);
+    if (predecessor)
+        predecessor->unlock();
+    if (new_current)
+        new_current->unlock();
     T val = current->getValue();
     delete current;
     return val;
